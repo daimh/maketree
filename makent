@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+#Author: Manhong Dai, manhongdai@gmail.com
+#License: GPLv3
+import argparse, subprocess, sys
+class Node():
+	def __init__(self, target, parent, depth):
+		self.target = target
+		self.parent = parent
+		self.depth = depth
+		self.children = []
+		self.need_remake = False
+	def add_node(self, depth, target):
+		node = self
+		for i in range(self.depth-depth+1):
+			node = node.parent
+		child = Node(target, node, depth)
+		node.children.append(child)
+		return child
+	def trim_me(self):
+		self.children = [chld for chld in self.children if chld.trim_me()]
+		if self.target == '┐': self.need_remake = len(self.children) > 0
+		return self.need_remake
+	def print_me(self, depth, spaces):
+		for i in range(depth):
+			if i == depth - 1:
+				if spaces[i]:
+					print('├──', end='')
+				else:
+					print('└──', end='')
+			else:
+				if spaces[i]:
+					print('│  ', end='')
+				else:
+					print('   ', end='')
+		if depth > 0:
+			if self.need_remake:
+				print(self.target)
+			else:
+				print('\033[9m' + self.target + '\033[0m')
+		count = len(self.children)
+		printed = False
+		for idx in range(count):
+			if self.children[idx].print_me(depth+1, spaces+[idx < count-1]):
+				printed = True
+		return printed
+	def parse(self, lines, idx):
+		tgt2node = {}
+		s_consider = "Considering target file "
+		s_noneed = "No need to remake target "
+		s_remake = "Must remake target "
+		wait = True
+		node = self
+		while idx < len(lines):
+			ln = lines[idx]
+			idx += 1
+			if not ln.endswith('.'): continue
+			if ln.startswith('Putting child '): 
+				recursion = Node('┐', None, 0)
+				idx = recursion.parse(lines, idx+1)
+				branch = ln[ln.index('(')+1:ln.rindex(')')]
+				tgt2node[branch].children.append(recursion)
+			elif ln.startswith('Removing child '): 
+				return idx + 1
+			if wait:
+				wait = not ln.startswith('Updating goal targets')
+				continue
+			if s_consider in ln: 
+				target = ln[ln.index("'")+1:ln.rindex("'")]
+				depth = int(ln.index('C')/2) + 1
+				if target in tgt2node: raise Exception(f'BUG-001')
+				node = node.add_node(depth, target)
+				tgt2node[target] = node
+			elif s_noneed in ln: 
+				target = ln[ln.index("'")+1:ln.rindex("'")]
+				tgt2node[target].need_remake = False
+			elif s_remake in ln:
+				target = ln[ln.index("'")+1:ln.rindex("'")]
+				tgt2node[target].need_remake = True
+
+def get_args():
+	parser = argparse.ArgumentParser()
+	parser.add_argument("MakeArguments", help="arguments passed to make. Tip: Use '--' to separate them from makent's own arguments. E.g., 'makent -a -- -B'", nargs='*')
+	parser.add_argument("-V", "--version", action='version', version='20220911')
+	parser.add_argument("-a", "--all", help="show all make targets. Strikethrough means no need to remake", action="store_true", required=False)
+	return parser.parse_args()
+	
+def	check_make_version():
+	try:
+		ps = subprocess.run(['make', '--version'], stdout=subprocess.PIPE)
+		if ps.returncode != 0: sys.exit(1)
+	except FileNotFoundError:
+		print("No 'make' in your PATH, quitting")
+		sys.exit(1)
+	if ps.stdout[:9] != b'GNU Make ' or ps.stdout[9:11] in [ b'3.', b'2.', b'1.']:
+		print("'make' is not version 4 or newer, quitting")
+		sys.exit(1)
+
+def main():
+	check_make_version()
+	args = get_args()
+	make = ['make', '-d', '-nt']
+	make += args.MakeArguments
+	ps = subprocess.run(make, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	del make[1]
+	if ps.returncode != 0:
+		print('/', ' '.join(make), sep='')
+		ps = subprocess.run(make)
+		return 1
+	lines = str(ps.stdout, 'utf-8').split('\n')
+	root = Node('/' + ' '.join(make), None, 0)
+	root.parse(lines, 0)
+	if not args.all: root.trim_me()
+	root.print_me(0, [])
+
+if __name__ == '__main__': main()
