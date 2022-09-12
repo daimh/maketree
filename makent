@@ -67,7 +67,11 @@ class Node():
 			if s_consider in ln: 
 				target = ln[ln.index("'")+1:ln.rindex("'")]
 				depth = int(ln.index('C')/2) + 1
-				if target in tgt2node: raise Exception(f'BUG-001')
+				if target in tgt2node:
+					if lines[idx].strip() != f"File '{target}' was considered already.":
+						raise Exception(f'BUG-001: {ln}')
+					idx += 1
+					continue
 				node = node.add_node(depth, target)
 				tgt2node[target] = node
 			elif s_noneed in ln: 
@@ -80,7 +84,7 @@ class Node():
 def get_args():
 	parser = argparse.ArgumentParser()
 	parser.add_argument("MakeArguments", help="arguments passed to make. Tip: Use '--' to separate them from makent's own arguments. E.g., 'makent -a -- -B'", nargs='*')
-	parser.add_argument("-V", "--version", action='version', version='20220911')
+	parser.add_argument("-V", "--version", action='version', version='20220912')
 	parser.add_argument("-a", "--all", help="show all make targets. Strikethrough means no need to remake", action="store_true", required=False)
 	return parser.parse_args()
 	
@@ -103,9 +107,8 @@ def main():
 	ps = subprocess.run(make, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	del make[1]
 	if ps.returncode != 0:
-		print('/', ' '.join(make), sep='')
-		ps = subprocess.run(make)
-		return 1
+		print(f"'make -nt' failed with code {ps.returncode}", file=sys.stderr)
+		exit(1)
 	lines = str(ps.stdout, 'utf-8').split('\n')
 	root = Node('/' + ' '.join(make), None, 0)
 	root.parse(lines, 0)
