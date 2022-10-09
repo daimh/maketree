@@ -36,7 +36,7 @@ class Node():
 			if self.need_remake:
 				print(self.target)
 			else:
-				print('\033[9m' + self.target + '\033[0m')
+				print(self.target, '(up to date)')
 		count = len(self.children)
 		printed = False
 		for idx in range(count):
@@ -84,8 +84,8 @@ class Node():
 def get_args():
 	parser = argparse.ArgumentParser()
 	parser.add_argument("MakeArguments", help="arguments passed to make. Tip: Use '--' to separate them from makent's own arguments. E.g., 'makent -a -- -B'", nargs='*')
-	parser.add_argument("-V", "--version", action='version', version='20220912')
-	parser.add_argument("-a", "--all", help="show all make targets. Strikethrough means no need to remake", action="store_true", required=False)
+	parser.add_argument("-V", "--version", action='version', version='20221009')
+	parser.add_argument("-a", "--all", help="show all make targets including those up to date.", action="store_true", required=False)
 	return parser.parse_args()
 	
 def	check_make_version():
