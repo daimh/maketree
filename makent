@@ -1,26 +1,24 @@
 #!/usr/bin/env python3
-#Author: Manhong Dai, manhongdai@gmail.com
-#License: GPLv3
-import argparse, subprocess, sys
+# Author: Manhong Dai, manhongdai@gmail.com
+# License: GPLv3
+import argparse
+import subprocess
+import sys
+
+
 class Node():
-	def __init__(self, target, parent, depth):
+	def __init__(self, target, parent):
 		self.target = target
 		self.parent = parent
-		self.depth = depth
 		self.children = []
 		self.need_remake = False
-	def add_node(self, depth, target):
-		node = self
-		for i in range(self.depth-depth+1):
-			node = node.parent
-		child = Node(target, node, depth)
-		node.children.append(child)
-		return child
+
 	def trim_me(self):
 		self.children = [chld for chld in self.children if chld.trim_me()]
-		if self.target == '┐': self.need_remake = len(self.children) > 0
+		self.need_remake = self.need_remake or len(self.children) > 0
 		return self.need_remake
-	def print_me(self, depth, spaces):
+
+	def print_me(self, depth=0, spaces=[]):
 		for i in range(depth):
 			if i == depth - 1:
 				if spaces[i]:
@@ -43,61 +41,87 @@ class Node():
 			if self.children[idx].print_me(depth+1, spaces+[idx < count-1]):
 				printed = True
 		return printed
-	def parse(self, lines, idx):
-		tgt2node = {}
-		s_consider = "Considering target file "
-		s_noneed = "No need to remake target "
-		s_remake = "Must remake target "
+
+	def parse(self, lines, row):
+#		tgt2node = {}
+		considered = set()
 		wait = True
 		node = self
-		while idx < len(lines):
-			ln = lines[idx]
-			idx += 1
-			if not ln.endswith('.'): continue
-			if ln.startswith('Putting child '): 
-				recursion = Node('┐', None, 0)
-				idx = recursion.parse(lines, idx+1)
-				branch = ln[ln.index('(')+1:ln.rindex(')')]
-				tgt2node[branch].children.append(recursion)
-			elif ln.startswith('Removing child '): 
-				return idx + 1
+		while row < len(lines):
+			ln = lines[row]
+			row += 1
+			if not ln.endswith('.'):
+				continue
+			if ln.startswith('Putting child '):
+				recursion = Node('┐', node)
+				row = recursion.parse(lines, row+1)
+				target = ln[ln.index('(')+1:ln.rindex(')')]
+				node.children.append(recursion)
+#				tgt2node[branch].children.append(recursion)
+			elif ln.startswith('Removing child '):
+				return row + 1
 			if wait:
 				wait = not ln.startswith('Updating goal targets')
 				continue
-			if s_consider in ln: 
+			if "Considering target file " in ln:
 				target = ln[ln.index("'")+1:ln.rindex("'")]
-				depth = int(ln.index('C')/2) + 1
-				if target in tgt2node:
-					if lines[idx].strip() != f"File '{target}' was considered already.":
-						raise Exception(f'BUG-001: {ln}')
-					idx += 1
+#				if target in tgt2node:
+				if target in considered:
+					if lines[row].strip() != f"File '{target}' was considered already.":
+						quit(f'ERR-002: contact developer with "{ln}"')
+					row += 1
 					continue
-				node = node.add_node(depth, target)
-				tgt2node[target] = node
-			elif s_noneed in ln: 
+				child = Node(target, node)
+#				tgt2node[target] = child
+				node.children.append(child)
+				node = child
+			elif "No need to remake target " in ln:
 				target = ln[ln.index("'")+1:ln.rindex("'")]
-				tgt2node[target].need_remake = False
-			elif s_remake in ln:
+#				tgt2node[target].need_remake = False
+				node.need_remake = False
+				considered.add(target)
+				node = node.parent
+			elif "Must remake target " in ln:
 				target = ln[ln.index("'")+1:ln.rindex("'")]
-				tgt2node[target].need_remake = True
+#				tgt2node[target].need_remake = True
+				node.need_remake = True
+				considered.add(target)
+				node = node.parent
+
 
 def get_args():
 	parser = argparse.ArgumentParser()
-	parser.add_argument("MakeArguments", help="arguments passed to make. Tip: Use '--' to separate them from makent's own arguments. E.g., 'makent -a -- -B'", nargs='*')
-	parser.add_argument("-V", "--version", action='version', version='20221009')
-	parser.add_argument("-a", "--all", help="show all make targets including those up to date.", action="store_true", required=False)
+	parser.add_argument(
+		"MakeArguments",
+		help=(
+			"arguments passed to make. Tip: Use '--' to separate them from"
+			"makent's own arguments. E.g., 'makent -a -- -B'"),
+		nargs='*')
+	parser.add_argument("-V", "--version", action='version', version='20221112')
+	parser.add_argument(
+		"-a",
+		"--all",
+		help="show all make targets including those up to date.",
+		action="store_true",
+		required=False)
 	return parser.parse_args()
-	
-def	check_make_version():
+
+
+def quit(msg):
+	print(msg)
+	sys.exit(1)
+
+
+def check_make_version():
 	try:
 		ps = subprocess.run(['make', '--version'], stdout=subprocess.PIPE)
-		if ps.returncode != 0: sys.exit(1)
+		if ps.returncode != 0:
+			sys.exit(1)
 	except FileNotFoundError:
-		print("No 'make' in your PATH, quitting")
-		sys.exit(1)
-	if ps.stdout[:9] != b'GNU Make ' or ps.stdout[9:11] in [ b'3.', b'2.', b'1.']:
-		print("'make' is not version 4 or newer, quitting")
-		sys.exit(1)
+		quit("ERR-003: No 'make' in your PATH")
+	if ps.stdout[:9] != b'GNU Make ' or ps.stdout[9:11] in [b'3.', b'2.', b'1.']:
+		quit("ERR-004: 'make' is not version 4 or newer")
+
 
 def main():
 	check_make_version()
@@ -107,12 +131,14 @@ def main():
 	ps = subprocess.run(make, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	del make[1]
 	if ps.returncode != 0:
-		print(f"'make -nt' failed with code {ps.returncode}", file=sys.stderr)
-		exit(1)
+		quit(f"'make -nt' failed with exit code {ps.returncode}", file=sys.stderr)
 	lines = str(ps.stdout, 'utf-8').split('\n')
-	root = Node('/' + ' '.join(make), None, 0)
+	root = Node('/' + ' '.join(make), None)
 	root.parse(lines, 0)
-	if not args.all: root.trim_me()
-	root.print_me(0, [])
+	if not args.all:
+		root.trim_me()
+	root.print_me()
 
-if __name__ == '__main__': main()
+
+if __name__ == '__main__':
+	main()
