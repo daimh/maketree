@@ -43,7 +43,6 @@ class Node():
 		return printed
 
 	def parse(self, lines, row):
-#		tgt2node = {}
 		considered = set()
 		wait = True
 		node = self
@@ -52,38 +51,33 @@ class Node():
 			row += 1
 			if not ln.endswith('.'):
 				continue
-			if ln.startswith('Putting child '):
+			elif wait:
+				wait = not ln.startswith('Updating goal targets')
+				continue
+			elif ln.startswith('Putting child '):
 				recursion = Node('┐', node)
 				row = recursion.parse(lines, row+1)
 				target = ln[ln.index('(')+1:ln.rindex(')')]
 				node.children.append(recursion)
-#				tgt2node[branch].children.append(recursion)
 			elif ln.startswith('Removing child '):
 				return row + 1
-			if wait:
-				wait = not ln.startswith('Updating goal targets')
-				continue
-			if "Considering target file " in ln:
+			elif "Considering target file " in ln:
 				target = ln[ln.index("'")+1:ln.rindex("'")]
-#				if target in tgt2node:
 				if target in considered:
 					if lines[row].strip() != f"File '{target}' was considered already.":
 						quit(f'ERR-002: contact developer with "{ln}"')
 					row += 1
 					continue
 				child = Node(target, node)
-#				tgt2node[target] = child
 				node.children.append(child)
 				node = child
 			elif "No need to remake target " in ln:
 				target = ln[ln.index("'")+1:ln.rindex("'")]
-#				tgt2node[target].need_remake = False
 				node.need_remake = False
 				considered.add(target)
 				node = node.parent
 			elif "Must remake target " in ln:
 				target = ln[ln.index("'")+1:ln.rindex("'")]
-#				tgt2node[target].need_remake = True
 				node.need_remake = True
 				considered.add(target)
 				node = node.parent
@@ -97,7 +91,7 @@ def get_args():
 			"arguments passed to make. Tip: Use '--' to separate them from"
 			"makent's own arguments. E.g., 'makent -a -- -B'"),
 		nargs='*')
-	parser.add_argument("-V", "--version", action='version', version='20221112')
+	parser.add_argument("-V", "--version", action='version', version='20221113')
 	parser.add_argument(
 		"-a",
 		"--all",
@@ -131,7 +125,7 @@ def main():
 	ps = subprocess.run(make, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	del make[1]
 	if ps.returncode != 0:
-		quit(f"'make -nt' failed with exit code {ps.returncode}", file=sys.stderr)
+		quit(f"'make -nt' failed with exit code {ps.returncode}")
 	lines = str(ps.stdout, 'utf-8').split('\n')
 	root = Node('/' + ' '.join(make), None)
 	root.parse(lines, 0)

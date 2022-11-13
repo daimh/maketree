@@ -10,14 +10,12 @@ mv makent ~/bin/ # or any directory in PATH
 ```
 
 ## Try out
+
+Each \*.mk file is an example, while the Makefile combines all the tests in one file. 
 ```
-wget https://raw.githubusercontent.com/daimh/makent/master/Makefile
-makent
-touch tc
-makent
-makent -a
-makent -a -- -B
-makent -- t1 t2
+cd test
+make -n # check out how to run each makent example
+make # run them all
 ```
 
 ## Help

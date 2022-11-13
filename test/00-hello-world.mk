@@ -1,4 +1,4 @@
-t1 : ta tb tc
+00 : ta tb tc
 	:
 ta : tc
 	:
