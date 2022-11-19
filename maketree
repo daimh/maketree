@@ -12,6 +12,8 @@ class Node():
 		self.parent = parent
 		self.children = []
 		self.need_remake = False
+		if parent is not None:
+			parent.children.append(self)
 
 	def trim_me(self):
 		self.children = [chld for chld in self.children if chld.trim_me()]
@@ -42,45 +44,44 @@ class Node():
 				printed = True
 		return printed
 
-	def parse(self, lines, row):
-		considered = set()
-		wait = True
-		node = self
-		while row < len(lines):
-			ln = lines[row]
-			row += 1
+	def parse(self, lines):
+		while len(lines) > 0:
+			ln = lines.pop(0)
 			if not ln.endswith('.'):
 				continue
-			elif wait:
-				wait = not ln.startswith('Updating goal targets')
-				continue
 			elif ln.startswith('Putting child '):
-				recursion = Node('┐', node)
-				row = recursion.parse(lines, row+1)
-				target = ln[ln.index('(')+1:ln.rindex(')')]
-				node.children.append(recursion)
+				recursion = Node('┐', self)
+				update_goal_targets(lines)
+				recursion.parse(lines)
 			elif ln.startswith('Removing child '):
-				return row + 1
+				return
 			elif "Considering target file " in ln:
 				target = ln[ln.index("'")+1:ln.rindex("'")]
-				if target in considered:
-					if lines[row].strip() != f"File '{target}' was considered already.":
-						quit(f'ERR-002: contact developer with "{ln}"')
-					row += 1
+				if (
+					len(lines) > 0 
+					and lines[0].endswith(f"File '{target}' was considered already.")
+				):
+					lines.pop(0)
 					continue
-				child = Node(target, node)
-				node.children.append(child)
-				node = child
+				child = Node(target, self)
+				child.parse(lines)
 			elif "No need to remake target " in ln:
-				target = ln[ln.index("'")+1:ln.rindex("'")]
-				node.need_remake = False
-				considered.add(target)
-				node = node.parent
-			elif "Must remake target " in ln:
-				target = ln[ln.index("'")+1:ln.rindex("'")]
-				node.need_remake = True
-				considered.add(target)
-				node = node.parent
+				if self.target != ln[ln.index("'")+1:ln.rindex("'")]:
+					quit("ERR-001: target doesn't match")
+				self.need_remake = False
+				return
+			elif "Successfully remade target file " in ln:
+				if self.target != ln[ln.index("'")+1:ln.rindex("'")]:
+					print('daimh1', self.target)
+					print('daimh2', ln)
+					quit("ERR-002: target doesn't match.")
+				self.need_remake = True
+				return
+
+def update_goal_targets(lines):
+	while len(lines) > 0:
+		if lines.pop(0) == 'Updating goal targets....':
+			break
 
 
 def get_args():
@@ -89,9 +90,9 @@ def get_args():
 		"MakeArguments",
 		help=(
 			"arguments passed to make. Tip: Use '--' to separate them from"
-			"makent's own arguments. E.g., 'makent -a -- -B'"),
+			"maketree's own arguments. E.g., 'maketree -a -- -B'"),
 		nargs='*')
-	parser.add_argument("-V", "--version", action='version', version='20221113')
+	parser.add_argument("-V", "--version", action='version', version='20221119')
 	parser.add_argument(
 		"-a",
 		"--all",
@@ -120,15 +121,15 @@ def check_make_version():
 def main():
 	check_make_version()
 	args = get_args()
-	make = ['make', '-d', '-nt']
-	make += args.MakeArguments
+	make = ['make', '-d', '-nt'] + args.MakeArguments
 	ps = subprocess.run(make, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-	del make[1]
 	if ps.returncode != 0:
 		quit(f"'make -nt' failed with exit code {ps.returncode}")
-	lines = str(ps.stdout, 'utf-8').split('\n')
+	del make[1]
 	root = Node('/' + ' '.join(make), None)
-	root.parse(lines, 0)
+	lines = str(ps.stdout, 'utf-8').split('\n')
+	update_goal_targets(lines)
+	root.parse(lines)
 	if not args.all:
 		root.trim_me()
 	root.print_me()

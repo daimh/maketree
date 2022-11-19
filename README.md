@@ -1,12 +1,12 @@
-# makent, print a tree of dependencies from GNU make
+# maketree, print the dependency tree for GNU make
 
-'makent' assembles the dependency tree from make's debugging information, and prints it. It runs 'make -nt' in dry-run mode, and all the parameters after 'makent --'.
+'maketree' assembles the dependency tree from make's debugging information, and prints it. It runs 'make -nt' in dry-run mode, and all the parameters after 'maketree --'.
 
 ## Installation
 ```
-wget https://raw.githubusercontent.com/daimh/makent/master/makent
-chmod +x makent
-mv makent ~/bin/ # or any directory in PATH
+wget https://raw.githubusercontent.com/daimh/maketree/master/maketree
+chmod +x maketree
+mv maketree ~/bin/ # or any directory in PATH
 ```
 
 ## Try out
@@ -14,13 +14,13 @@ mv makent ~/bin/ # or any directory in PATH
 Each \*.mk file is an example, while the Makefile combines all the tests in one file. 
 ```
 cd test
-make -n # check out how to run each makent example
+make -n # check out how to run each maketree example
 make # run them all
 ```
 
 ## Help
 ```
-makent -h
+maketree -h
 ```
 
 ## Contribute
