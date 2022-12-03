@@ -65,15 +65,13 @@ class Node():
 					continue
 				child = Node(target, self)
 				child.parse(lines)
-			elif "No need to remake target " in ln:
+			elif "No need to remake target " in ln or ln.endswith(" was considered already."):
 				if self.target != ln[ln.index("'")+1:ln.rindex("'")]:
 					quit("ERR-001: target doesn't match")
 				self.need_remake = False
 				return
 			elif "Successfully remade target file " in ln:
 				if self.target != ln[ln.index("'")+1:ln.rindex("'")]:
-					print('daimh1', self.target)
-					print('daimh2', ln)
 					quit("ERR-002: target doesn't match.")
 				self.need_remake = True
 				return
@@ -92,7 +90,7 @@ def get_args():
 			"arguments passed to make. Tip: Use '--' to separate them from"
 			"maketree's own arguments. E.g., 'maketree -a -- -B'"),
 		nargs='*')
-	parser.add_argument("-V", "--version", action='version', version='20221119')
+	parser.add_argument("-V", "--version", action='version', version='20221203')
 	parser.add_argument(
 		"-a",
 		"--all",
