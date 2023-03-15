@@ -58,14 +58,17 @@ class Node():
 			elif "Considering target file " in ln:
 				target = ln[ln.index("'")+1:ln.rindex("'")]
 				if (
-					len(lines) > 0 
+					len(lines) > 0
 					and lines[0].endswith(f"File '{target}' was considered already.")
 				):
 					lines.pop(0)
 					continue
 				child = Node(target, self)
 				child.parse(lines)
-			elif "No need to remake target " in ln or ln.endswith(" was considered already."):
+			elif (
+					"No need to remake target " in ln or
+				ln.endswith(" was considered already.")
+			):
 				if self.target != ln[ln.index("'")+1:ln.rindex("'")]:
 					quit("ERR-001: target doesn't match")
 				self.need_remake = False
@@ -75,6 +78,7 @@ class Node():
 					quit("ERR-002: target doesn't match.")
 				self.need_remake = True
 				return
+
 
 def update_goal_targets(lines):
 	while len(lines) > 0:
