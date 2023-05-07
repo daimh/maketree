@@ -31,7 +31,7 @@ Contributions are always welcome!
 
 Developed by Manhong Dai
 
-Copyright © 2021 University of Michigan
+Copyright © University of Michigan
 
 License [GPLv3](https://gnu.org/licenses/gpl.html): GNU GPL version 3
 
