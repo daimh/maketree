@@ -25,14 +25,14 @@ class Node():
 		for i in range(depth):
 			if i == depth - 1:
 				if spaces[i]:
-					print('├──', end='')
+					print('├── ', end='')
 				else:
-					print('└──', end='')
+					print('└── ', end='')
 			else:
 				if spaces[i]:
-					print('│  ', end='')
+					print('│   ', end='')
 				else:
-					print('   ', end='')
+					print('    ', end='')
 		if depth > 0:
 			if self.need_remake:
 				print(self.target)
