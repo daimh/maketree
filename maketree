@@ -7,136 +7,137 @@ import subprocess
 import sys
 
 
-class Node():
-	def __init__(self, target, parent):
-		self.target = target
-		self.parent = parent
-		self.children = []
-		self.need_remake = False
-		if parent is not None:
-			parent.children.append(self)
+class Node:
+    def __init__(self, target, parent):
+        self.target = target
+        self.parent = parent
+        self.children = []
+        self.need_remake = False
+        if parent is not None:
+            parent.children.append(self)
 
-	def trim_me(self):
-		self.children = [chld for chld in self.children if chld.trim_me()]
-		self.need_remake = self.need_remake or len(self.children) > 0
-		return self.need_remake
+    def trim_me(self):
+        self.children = [chld for chld in self.children if chld.trim_me()]
+        self.need_remake = self.need_remake or len(self.children) > 0
+        return self.need_remake
 
-	def print_me(self, depth=0, spaces=[]):
-		for i in range(depth):
-			if i == depth - 1:
-				if spaces[i]:
-					print('├── ', end='')
-				else:
-					print('└── ', end='')
-			else:
-				if spaces[i]:
-					print('│   ', end='')
-				else:
-					print('    ', end='')
-		if depth > 0:
-			if self.need_remake:
-				print(self.target)
-			else:
-				print(self.target, '(up to date)')
-		count = len(self.children)
-		printed = False
-		for idx in range(count):
-			if self.children[idx].print_me(depth+1, spaces+[idx < count-1]):
-				printed = True
-		return printed
+    def print_me(self, depth=0, spaces=[]):
+        for i in range(depth):
+            if i == depth - 1:
+                if spaces[i]:
+                    print("├── ", end="")
+                else:
+                    print("└── ", end="")
+            else:
+                if spaces[i]:
+                    print("│   ", end="")
+                else:
+                    print("    ", end="")
+        if depth > 0:
+            if self.need_remake:
+                print(self.target)
+            else:
+                print(self.target, "(up to date)")
+        count = len(self.children)
+        printed = False
+        for idx in range(count):
+            if self.children[idx].print_me(depth + 1, spaces + [idx < count - 1]):
+                printed = True
+        return printed
 
-	def parse(self, lines):
-		while len(lines) > 0:
-			ln = lines.pop(0)
-			if not ln.endswith('.'):
-				continue
-			elif ln.startswith('Putting child '):
-				recursion = Node('┐', self)
-				update_goal_targets(lines)
-				recursion.parse(lines)
-			elif ln.startswith('Removing child '):
-				return
-			elif "Considering target file " in ln:
-				target = ln[ln.index("'")+1:ln.rindex("'")]
-				if (
-					len(lines) > 0
-					and lines[0].endswith(f"File '{target}' was considered already.")
-				):
-					lines.pop(0)
-					continue
-				child = Node(target, self)
-				child.parse(lines)
-			elif (
-					"No need to remake target " in ln or
-				ln.endswith(" was considered already.")
-			):
-				if self.target != ln[ln.index("'")+1:ln.rindex("'")]:
-					quit("ERR-001: target doesn't match")
-				self.need_remake = False
-				return
-			elif "Successfully remade target file " in ln:
-				if self.target != ln[ln.index("'")+1:ln.rindex("'")]:
-					quit("ERR-002: target doesn't match.")
-				self.need_remake = True
-				return
+    def parse(self, lines):
+        while len(lines) > 0:
+            ln = lines.pop(0)
+            if not ln.endswith("."):
+                continue
+            elif ln.startswith("Putting child "):
+                recursion = Node("┐", self)
+                update_goal_targets(lines)
+                recursion.parse(lines)
+            elif ln.startswith("Removing child "):
+                return
+            elif "Considering target file " in ln:
+                target = ln[ln.index("'") + 1 : ln.rindex("'")]
+                if len(lines) > 0 and lines[0].endswith(
+                    f"File '{target}' was considered already."
+                ):
+                    lines.pop(0)
+                    continue
+                child = Node(target, self)
+                child.parse(lines)
+            elif "No need to remake target " in ln or ln.endswith(
+                " was considered already."
+            ):
+                if self.target != ln[ln.index("'") + 1 : ln.rindex("'")]:
+                    quit("ERR-001: target doesn't match")
+                self.need_remake = False
+                return
+            elif "Successfully remade target file " in ln:
+                if self.target != ln[ln.index("'") + 1 : ln.rindex("'")]:
+                    quit("ERR-002: target doesn't match.")
+                self.need_remake = True
+                return
 
 
 def update_goal_targets(lines):
-	while len(lines) > 0:
-		if lines.pop(0) == 'Updating goal targets....':
-			break
+    while len(lines) > 0:
+        if lines.pop(0) == "Updating goal targets....":
+            break
 
 
 def get_args():
-	parser = argparse.ArgumentParser()
-	parser.add_argument(
-		"MakeArguments",
-		help=(
-			"arguments passed to make. Tip: Use '--' to separate them from"
-			"maketree's own arguments. E.g., 'maketree -a -- -B'"),
-		nargs='*')
-	parser.add_argument("-V", "--version", action='version', version='20221203')
-	parser.add_argument(
-		"-a",
-		"--all",
-		help="show all make targets including those up to date.",
-		action="store_true",
-		required=False)
-	return parser.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "MakeArguments",
+        help=(
+            "arguments passed to make. Tip: Use '--' to separate them from"
+            "maketree's own arguments. E.g., 'maketree -a -- -B'"
+        ),
+        nargs="*",
+    )
+    parser.add_argument("-V", "--version", action="version", version="20251229")
+    parser.add_argument(
+        "-a",
+        "--all",
+        help="show all make targets including those up to date.",
+        action="store_true",
+        required=False,
+    )
+    return parser.parse_args()
 
 
 def quit(msg):
-	print(msg)
-	sys.exit(1)
+    print(msg)
+    sys.exit(1)
 
 
 def check_make_version():
-	try:
-		ps = subprocess.run(['make', '--version'], stdout=subprocess.PIPE)
-		if ps.returncode != 0:
-			sys.exit(1)
-	except FileNotFoundError:
-		quit("ERR-003: No 'make' in your PATH")
-	if ps.stdout[:9] != b'GNU Make ' or ps.stdout[9:11] in [b'3.', b'2.', b'1.']:
-		quit("ERR-004: 'make' is not version 4 or newer")
+    try:
+        ps = subprocess.run(["make", "--version"], stdout=subprocess.PIPE)
+        if ps.returncode != 0:
+            sys.exit(1)
+    except FileNotFoundError:
+        quit("ERR-003: No 'make' in your PATH")
+    if ps.stdout[:9] != b"GNU Make " or ps.stdout[9:11] in [b"3.", b"2.", b"1."]:
+        quit("ERR-004: 'make' is not version 4 or newer")
 
 
 def main():
-	check_make_version()
-	args = get_args()
-	make = ['make', '-d', '-nt'] + args.MakeArguments
-	ps = subprocess.run(make, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-	if ps.returncode != 0:
-		quit(f"'make -nt' failed with exit code {ps.returncode}")
-	del make[1]
-	root = Node('/' + ' '.join(make), None)
-	lines = str(ps.stdout, 'utf-8').split('\n')
-	update_goal_targets(lines)
-	root.parse(lines)
-	if not args.all:
-		root.trim_me()
-	root.print_me()
+    check_make_version()
+    args = get_args()
+    make = ["make", "-d", "-nt"] + args.MakeArguments
+    ps = subprocess.run(make, stdout=subprocess.PIPE)
+    if ps.returncode != 0:
+        quit("'make -nt' failed")
+    del make[1]
+    root = Node("/" + " ".join(make), None)
+    lines = str(ps.stdout, "utf-8").split("\n")
+    update_goal_targets(lines)
+    root.parse(lines)
+    if not args.all:
+        root.trim_me()
+    root.print_me()
 
 
-if __name__ == '__main__':
-	main()
+if __name__ == "__main__":
+    main()
